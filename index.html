@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- XLSX Library for Excel processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Supabase JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- React and ReactDOM CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -56,29 +58,24 @@
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "react": "https://aistudiocdn.com/react@^19.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5"
+    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.77.0"
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-[#152C47]">
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
+        // --- Supabase Client ---
+        const { createClient } = supabase;
+        const supabaseUrl = 'https://uemerxsdwrygafqmwvdz.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlbWVyeHNkd3J5Z2FmcW13dmR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEyNDY2MjgsImV4cCI6MjA3NjgyMjYyOH0.F35Dj1qUxPDQlSdz82KAeH6wGIz_uDYCZpoeJs0LC-c';
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+        
         // --- CONSTANTS ---
-        const DRIVERS = [
-          { nombre: 'Jaime Delgado', cedula: '19400014' },
-          { nombre: 'Wilson Villalba', cedula: '79524400' },
-          { nombre: 'Alex Garcia', cedula: '79824106' },
-          { nombre: 'Brayan Diaz', cedula: '1073237805' },
-        ];
-        const VEHICLES = [
-          { placa: 'TLB045', marca: 'HINO', tipo: 'CAMION', capacidad: 2800 },
-          { placa: 'JUZ129', marca: 'HINO', tipo: 'CAMION', capacidad: 4050 },
-          { placa: 'THY972', marca: 'MERCEDES BENZ', tipo: 'ESPRINTER 314', capacidad: 660 },
-          { placa: 'WLS485', marca: 'MERCEDES BENZ', tipo: 'ESPRINTER 314', capacidad: 660 },
-        ];
+        const LOGO_URL = 'https://uemerxsdwrygafqmwvdz.supabase.co/storage/v1/object/sign/imagenes/logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzVkZWIxYi00MWYyLTRjN2QtYWQ2Ni0wN2YyNDU1YzNlYTUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbWFnZW5lcy9sb2dvLnBuZyIsImlhdCI6MTc2MTc0NzQ4MiwiZXhwIjoxNzkzMjgzNDgyfQ.ZbKEeYvifiVXIDWlXRek6MZnJY2QS-P3ILYz2MVuCTc';
         const DELIVERIES_PER_PAGE = 13;
         const AUDIT_DELIVERIES_PER_PAGE = 13;
 
@@ -157,14 +154,16 @@
           );
         };
 
-        const FormControls = ({ formData, setFormData }) => {
+        const FormControls = ({ formData, setFormData, drivers, vehicles, loading }) => {
           const handleDriverChange = (e) => {
-            const selectedDriver = DRIVERS.find(d => d.cedula === e.target.value) || null;
+            const val = String(e.target.value);
+            const selectedDriver = (drivers || []).find(d => String(d.cedula) === val) || null;
             setFormData(prev => ({ ...prev, conductor: selectedDriver }));
           };
 
           const handleVehicleChange = (e) => {
-            const selectedVehicle = VEHICLES.find(v => v.placa === e.target.value) || null;
+            const val = String(e.target.value);
+            const selectedVehicle = (vehicles || []).find(v => String(v.placa) === val) || null;
             setFormData(prev => ({ ...prev, vehiculo: selectedVehicle }));
           };
 
@@ -174,57 +173,89 @@
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div>
                   <label htmlFor="conductor" className="block text-sm font-medium text-[#A3E5F5] mb-1">Conductor</label>
-                  <select
-                    id="conductor"
-                    value={formData.conductor?.cedula || ''}
-                    onChange={handleDriverChange}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
-                  >
-                    <option value="" disabled>Seleccione un conductor</option>
-                    {DRIVERS.map(driver => (
-                      <option key={driver.cedula} value={driver.cedula}>{driver.nombre}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      id="conductor"
+                      value={formData.conductor?.cedula || ''}
+                      onChange={handleDriverChange}
+                      className="appearance-none mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
+                    >
+                      <option value="" disabled>Seleccione un conductor</option>
+                      {loading ? (
+                        <option disabled>Cargando conductores...</option>
+                      ) : drivers && drivers.length > 0 ? (
+                        drivers.map(driver => (
+                          <option key={driver.cedula} value={driver.cedula}>{driver.nombres}</option>
+                        ))
+                      ) : (
+                        <option disabled>No se encontraron conductores</option>
+                      )}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                      <ChevronDownIcon className="h-5 w-5 mt-1" />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="vehiculo" className="block text-sm font-medium text-[#A3E5F5] mb-1">Vehículo (Placa)</label>
-                  <select
-                    id="vehiculo"
-                    value={formData.vehiculo?.placa || ''}
-                    onChange={handleVehicleChange}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
-                  >
-                    <option value="" disabled>Seleccione un vehículo</option>
-                    {VEHICLES.map(vehicle => (
-                      <option key={vehicle.placa} value={vehicle.placa}>{vehicle.placa} - {vehicle.marca}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      id="vehiculo"
+                      value={formData.vehiculo?.placa || ''}
+                      onChange={handleVehicleChange}
+                      className="appearance-none mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
+                    >
+                      <option value="" disabled>Seleccione un vehículo</option>
+                      {loading ? (
+                        <option disabled>Cargando vehículos...</option>
+                      ) : vehicles && vehicles.length > 0 ? (
+                        vehicles.map(vehicle => (
+                          <option key={vehicle.placa} value={vehicle.placa}>{vehicle.placa} - {vehicle.marca}</option>
+                        ))
+                      ) : (
+                        <option disabled>No se encontraron vehículos</option>
+                      )}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                      <ChevronDownIcon className="h-5 w-5 mt-1" />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="turno" className="block text-sm font-medium text-[#A3E5F5] mb-1">Turno</label>
-                  <select
-                    id="turno"
-                    value={formData.turno}
-                    onChange={e => setFormData(prev => ({ ...prev, turno: e.target.value }))}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
-                  >
-                    <option value="AM">AM</option>
-                    <option value="PM">PM</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      id="turno"
+                      value={formData.turno}
+                      onChange={e => setFormData(prev => ({ ...prev, turno: e.target.value }))}
+                      className="appearance-none mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                      <ChevronDownIcon className="h-5 w-5 mt-1" />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="ruta" className="block text-sm font-medium text-[#A3E5F5] mb-1">Ruta</label>
-                  <select
-                    id="ruta"
-                    value={formData.ruta}
-                    onChange={e => setFormData(prev => ({ ...prev, ruta: e.target.value }))}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
-                  >
-                    <option>Centro</option>
-                    <option>Sur</option>
-                    <option>Norte</option>
-                    <option>Chia</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      id="ruta"
+                      value={formData.ruta}
+                      onChange={e => setFormData(prev => ({ ...prev, ruta: e.target.value }))}
+                      className="appearance-none mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
+                    >
+                      <option>Centro</option>
+                      <option>Sur</option>
+                      <option>Norte</option>
+                      <option>Chia</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                      <ChevronDownIcon className="h-5 w-5 mt-1" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -367,6 +398,9 @@
           highlightedCustomers,
           generateAuditSheet,
           setGenerateAuditSheet,
+          drivers,
+          vehicles,
+          loading,
         }) => {
           return (
             <div className="space-y-8">
@@ -378,7 +412,7 @@
                     : "Todas las entregas de este archivo ya han sido procesadas."}
                 </p>
               </div>
-              <FormControls formData={formData} setFormData={setFormData} />
+              <FormControls formData={formData} setFormData={setFormData} drivers={drivers} vehicles={vehicles} loading={loading} />
               <CustomerList
                 customers={customers}
                 selectedDeliveries={selectedDeliveries}
@@ -419,7 +453,7 @@
                         {/* Header Info */}
                         <tr>
                             <td rowSpan="4" colSpan="2" className="border border-black p-1 align-middle text-center">
-                                <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05="Logo" className="max-h-24 mx-auto" />
+                                <img src={LOGO_URL} alt="Logo" className="max-h-24 mx-auto" />
                             </td>
                             <td rowSpan="4" colSpan="6" className="border border-black p-1 align-middle text-center font-bold text-sm">FORMATO CONTROL RUTA URBANA PDC</td>
                             <td colSpan="2" className="border border-black p-1">Código</td>
@@ -459,7 +493,7 @@
                             <td className="p-1 border border-black font-bold">HORA DE SALIDA</td>
                             <td className="p-1 border border-black text-center" colSpan="2"></td>
                             <td className="p-1 border border-black font-bold" colSpan="2">NOMBRE DEL CONDUCTOR</td>
-                            <td className="p-1 border border-black text-center" colSpan="2">{formData.conductor?.nombre || ''}</td>
+                            <td className="p-1 border border-black text-center" colSpan="2">{formData.conductor?.nombres || ''}</td>
                             <td className="p-1 border border-black font-bold">IDENTIFICACIÓN</td>
                             <td className="p-1 border border-black text-center" colSpan="2">{formData.conductor?.cedula || ''}</td>
                             <td colSpan="1" className="border-r border-black"></td>
@@ -531,7 +565,7 @@
                         {/* Header Info */}
                         <tr>
                             <td rowSpan="4" colSpan="2" className="border border-black p-1 align-middle text-center">
-                                <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05" alt="Logo" className="max-h-16 mx-auto" />
+                                <img src={LOGO_URL} alt="Logo" className="max-h-16 mx-auto" />
                             </td>
                             <td rowSpan="4" colSpan="5" className="border border-black p-1 align-middle text-center font-bold text-base">FORMATO AUDITORIA INSPECCIÓN SALIDA DE REPUESTOS<br/>NACIONAL Y LOCAL</td>
                             <td className="border border-black p-1 font-bold">Código</td>
@@ -696,7 +730,7 @@
                         {/* Header Info */}
                         <tr>
                             <td rowSpan="4" colSpan="2" className="border border-black p-1 align-middle text-center">
-                                <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05" alt="Logo" className="max-h-16 mx-auto" />
+                                <img src={LOGO_URL} alt="Logo" className="max-h-16 mx-auto" />
                             </td>
                             <td rowSpan="4" colSpan="5" className="border border-black p-1 align-middle text-center font-bold text-base">FORMATO AUDITORIA INSPECCIÓN SALIDA DE REPUESTOS<br/>NACIONAL Y LOCAL</td>
                             <td className="border border-black p-1 font-bold">Código</td>
@@ -869,7 +903,7 @@
                                 {/* Header Info */}
                                 <tr>
                                     <td rowSpan="4" colSpan="2" className="border border-black p-1 align-middle text-center">
-                                        <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05" alt="Logo" className="max-h-24 mx-auto" />
+                                        <img src={LOGO_URL} alt="Logo" className="max-h-24 mx-auto" />
                                     </td>
                                     <td rowSpan="4" colSpan="6" className="border border-black p-1 align-middle text-center font-bold text-sm">FORMATO CONTROL RUTA URBANA PDC</td>
                                     <td colSpan="2" className="border border-black p-1">Código</td>
@@ -1000,12 +1034,15 @@
         
         // --- MAIN APP ---
         const App = () => {
-          const { useState, useCallback, useMemo } = React;
+          const { useState, useCallback, useMemo, useEffect } = React;
           const [masterCustomerList, setMasterCustomerList] = useState(null);
           const [groupedCustomers, setGroupedCustomers] = useState(null);
           const [selectedDeliveries, setSelectedDeliveries] = useState(new Map());
           const [highlightedCustomers, setHighlightedCustomers] = useState(new Set());
           const [generateAuditSheet, setGenerateAuditSheet] = useState(false);
+          const [drivers, setDrivers] = useState([]);
+          const [vehicles, setVehicles] = useState([]);
+          const [loadingInitialData, setLoadingInitialData] = useState(true);
           
           const initialFormData = {
             turno: 'AM',
@@ -1018,6 +1055,41 @@
           const [view, setView] = useState('upload');
           const [error, setError] = useState(null);
           const [fileName, setFileName] = useState('');
+
+          useEffect(() => {
+            const fetchInitialData = async () => {
+                setLoadingInitialData(true);
+                setError(null);
+                try {
+                    console.info("Iniciando carga de datos desde Supabase...");
+
+                    const { data: driversData, error: driversError } = await supabaseClient.from('conductores').select('*');
+                    if (driversError) throw driversError;
+                    console.info("Conductores cargados:", driversData);
+                    if (!driversData || driversData.length === 0) {
+                        console.warn("Respuesta de Supabase para 'conductores' está vacía. Verifique los datos y las políticas de RLS.");
+                    }
+                    setDrivers((driversData || []).sort((a, b) => a.nombres.localeCompare(b.nombres)));
+
+                    const { data: vehiclesData, error: vehiclesError } = await supabaseClient.from('vehiculos').select('*');
+                    if (vehiclesError) throw vehiclesError;
+                    console.info("Vehículos cargados:", vehiclesData);
+                     if (!vehiclesData || vehiclesData.length === 0) {
+                        console.warn("Respuesta de Supabase para 'vehiculos' está vacía. Verifique los datos y las políticas de RLS.");
+                    }
+                    setVehicles((vehiclesData || []).sort((a, b) => a.placa.localeCompare(b.placa)));
+
+                } catch (error) {
+                    console.error("Error al cargar datos desde Supabase:", error);
+                    setError(`Error al conectar con la base de datos: ${error.message}. Por favor, revise la consola del navegador para más detalles y asegúrese de que el acceso anónimo (RLS) esté habilitado para las tablas 'conductores' y 'vehiculos'.`);
+                } finally {
+                    setLoadingInitialData(false);
+                }
+            };
+
+            fetchInitialData();
+        }, []);
+
 
           const processFile = useCallback((file) => {
             setFileName(file.name);
@@ -1173,7 +1245,7 @@
               <header className="bg-black/20 shadow-lg no-print">
                 <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
                   <h1 className="text-2xl font-bold text-white flex items-center">
-                    <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05" alt="Logo de la empresa" className="h-16 w-auto mr-4" />
+                    <img src={LOGO_URL} alt="Logo de la empresa" className="h-16 w-auto mr-4" />
                     Generador de Planillas de Despacho
                   </h1>
                   {view !== 'upload' && (
@@ -1203,12 +1275,15 @@
                     highlightedCustomers={highlightedCustomers}
                     generateAuditSheet={generateAuditSheet}
                     setGenerateAuditSheet={setGenerateAuditSheet}
+                    drivers={drivers}
+                    vehicles={vehicles}
+                    loading={loadingInitialData}
                   />
                 )}
 
-                {view === 'preview' && groupedCustomers && (
+                {view === 'preview' && masterCustomerList && (
                   <DispatchPreview
-                    customers={groupedCustomers}
+                    customers={masterCustomerList}
                     selectedDeliveries={selectedDeliveries}
                     formData={formData}
                     onBack={handleBackToEdit}
@@ -1227,6 +1302,5 @@
         root.render(<App />);
 
     </script>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
