@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Generador de Planillas de Despacho</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- XLSX Library for Excel processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- React and ReactDOM CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel Standalone for in-browser JSX/TSX transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* Custom styles for print layout */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .no-print {
+                display: none !important;
+            }
+            main, .dispatch-preview-container {
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+            .dispatch-page {
+                page-break-after: always;
+                box-shadow: none !important;
+                border: none !important;
+            }
+            .dispatch-page:last-child {
+                page-break-after: avoid;
+            }
+            .print-new-page {
+                page-break-before: always;
+            }
+            .dispatch-table-container {
+                width: 100%;
+                overflow: visible;
+            }
+            table {
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-[#152C47]">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        // --- CONSTANTS ---
+        const DRIVERS = [
+          { nombre: 'Jaime Delgado', cedula: '19400014' },
+          { nombre: 'Wilson Villalba', cedula: '79524400' },
+          { nombre: 'Alex Garcia', cedula: '79824106' },
+          { nombre: 'Brayan Diaz', cedula: '1073237805' },
+        ];
+        const VEHICLES = [
+          { placa: 'TLB045', marca: 'HINO', tipo: 'CAMION', capacidad: 2800 },
+          { placa: 'JUZ129', marca: 'HINO', tipo: 'CAMION', capacidad: 4050 },
+          { placa: 'THY972', marca: 'MERCEDES BENZ', tipo: 'ESPRINTER 314', capacidad: 660 },
+          { placa: 'WLS485', marca: 'MERCEDES BENZ', tipo: 'ESPRINTER 314', capacidad: 660 },
+        ];
+        const DELIVERIES_PER_PAGE = 13;
+        const AUDIT_DELIVERIES_PER_PAGE = 13;
+
+
+        // --- ICONS ---
+        const ChevronDownIcon = (props) => (
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        );
+
+        // --- COMPONENTS ---
+
+        const FileUpload = ({ onFileUpload, error }) => {
+          const [isDragging, setIsDragging] = React.useState(false);
+
+          const handleDrag = React.useCallback((e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.type === "dragenter" || e.type === "dragover") {
+              setIsDragging(true);
+            } else if (e.type === "dragleave") {
+              setIsDragging(false);
+            }
+          }, []);
+
+          const handleDrop = React.useCallback((e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(false);
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+              onFileUpload(e.dataTransfer.files[0]);
+            }
+          }, [onFileUpload]);
+
+          const handleChange = (e) => {
+            if (e.target.files && e.target.files[0]) {
+              onFileUpload(e.target.files[0]);
+            }
+          };
+
+          return (
+            <div className="text-center p-8">
+              <div className="max-w-2xl mx-auto bg-[#2D5E98] rounded-lg shadow-xl p-10">
+                <h2 className="text-2xl font-semibold text-white mb-4">Cargar Archivo de Despachos</h2>
+                <p className="text-[#A3E5F5] mb-6">
+                  Seleccione o arrastre y suelte el archivo de Excel (.xlsx, .xls) para comenzar.
+                </p>
+                <div 
+                  onDragEnter={handleDrag}
+                  onDragOver={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDrop={handleDrop}
+                  className={`relative border-2 border-dashed rounded-lg p-12 transition-colors duration-200 ${isDragging ? 'border-[#19BDE6] bg-[#19BDE6]/20' : 'border-[#858A8C] bg-[#152C47]'}`}
+                >
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".xlsx, .xls"
+                    onChange={handleChange}
+                  />
+                  <label htmlFor="file-upload" className="flex flex-col items-center justify-center space-y-4 cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-[#858A8C]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="text-lg text-white">
+                      <span className="font-semibold text-[#19BDE6]">Haga clic para cargar</span> o arrastre y suelte
+                    </p>
+                    <p className="text-sm text-[#A3E5F5]">Soportado: XLSX, XLS</p>
+                  </label>
+                </div>
+                {error && <p className="mt-4 text-[#A461AB] bg-[#A461AB]/20 p-3 rounded-md">{error}</p>}
+              </div>
+            </div>
+          );
+        };
+
+        const FormControls = ({ formData, setFormData }) => {
+          const handleDriverChange = (e) => {
+            const selectedDriver = DRIVERS.find(d => d.cedula === e.target.value) || null;
+            setFormData(prev => ({ ...prev, conductor: selectedDriver }));
+          };
+
+          const handleVehicleChange = (e) => {
+            const selectedVehicle = VEHICLES.find(v => v.placa === e.target.value) || null;
+            setFormData(prev => ({ ...prev, vehiculo: selectedVehicle }));
+          };
+
+          return (
+            <div className="bg-[#2D5E98] p-6 rounded-lg shadow-md no-print">
+              <h3 className="text-xl font-semibold mb-4 text-white">Datos Generales de la Planilla</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div>
+                  <label htmlFor="conductor" className="block text-sm font-medium text-[#A3E5F5] mb-1">Conductor</label>
+                  <select
+                    id="conductor"
+                    value={formData.conductor?.cedula || ''}
+                    onChange={handleDriverChange}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
+                  >
+                    <option value="" disabled>Seleccione un conductor</option>
+                    {DRIVERS.map(driver => (
+                      <option key={driver.cedula} value={driver.cedula}>{driver.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="vehiculo" className="block text-sm font-medium text-[#A3E5F5] mb-1">Vehículo (Placa)</label>
+                  <select
+                    id="vehiculo"
+                    value={formData.vehiculo?.placa || ''}
+                    onChange={handleVehicleChange}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
+                  >
+                    <option value="" disabled>Seleccione un vehículo</option>
+                    {VEHICLES.map(vehicle => (
+                      <option key={vehicle.placa} value={vehicle.placa}>{vehicle.placa} - {vehicle.marca}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="turno" className="block text-sm font-medium text-[#A3E5F5] mb-1">Turno</label>
+                  <select
+                    id="turno"
+                    value={formData.turno}
+                    onChange={e => setFormData(prev => ({ ...prev, turno: e.target.value }))}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="ruta" className="block text-sm font-medium text-[#A3E5F5] mb-1">Ruta</label>
+                  <select
+                    id="ruta"
+                    value={formData.ruta}
+                    onChange={e => setFormData(prev => ({ ...prev, ruta: e.target.value }))}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-[#152C47] text-white border-[#19BDE6] focus:outline-none focus:ring-[#19BDE6] focus:border-[#19BDE6] sm:text-sm rounded-md"
+                  >
+                    <option>Centro</option>
+                    <option>Sur</option>
+                    <option>Norte</option>
+                    <option>Chia</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const CustomerItem = ({ customer, selected, onSelectionChange, onSelectAll, isHighlighted }) => {
+          const [isOpen, setIsOpen] = React.useState(false);
+          const allSelected = customer.deliveries.length > 0 && selected.size === customer.deliveries.length;
+          
+          const handleCustomerSelection = (e) => {
+              const isChecked = e.target.checked;
+              onSelectAll(customer.customerCode, isChecked);
+              setIsOpen(isChecked);
+          };
+
+          return (
+            <div className={`border border-[#858A8C]/30 rounded-lg overflow-hidden bg-[#2D5E98]/50 transition-all duration-300 ${isHighlighted ? 'ring-2 ring-offset-2 ring-offset-[#152C47] ring-[#F1E519]' : ''}`}>
+                <div className="w-full flex justify-between items-center p-4 hover:bg-[#A3E5F5]/10">
+                    <label className="flex items-center space-x-3 cursor-pointer w-full">
+                        <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={handleCustomerSelection}
+                            className="h-5 w-5 rounded border-gray-400 bg-[#152C47] text-[#19BDE6] focus:ring-[#19BDE6] flex-shrink-0"
+                        />
+                        <div className="text-left flex-grow">
+                          <p className="font-semibold text-white">{customer.customerName}</p>
+                          <p className="text-sm text-[#A3E5F5]">{customer.customerCode} - {selected.size} de {customer.deliveries.length} entregas seleccionadas</p>
+                        </div>
+                    </label>
+                    <button
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="p-2 rounded-full hover:bg-[#A3E5F5]/20 focus:outline-none flex-shrink-0"
+                        aria-label="Expandir/Contraer"
+                    >
+                        <ChevronDownIcon className={`w-5 h-5 text-[#A3E5F5] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                </div>
+              {isOpen && (
+                <div className="p-4 border-t border-[#858A8C]/30 bg-[#152C47]/50">
+                    <div className="pb-3 mb-3 border-b border-[#858A8C]/30">
+                        <label className="flex items-center space-x-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={allSelected}
+                                onChange={(e) => onSelectAll(customer.customerCode, e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-400 bg-[#152C47] text-[#19BDE6] focus:ring-[#19BDE6]"
+                            />
+                            <span className="font-medium text-white">Seleccionar/Deseleccionar Todo</span>
+                        </label>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {customer.deliveries.map((delivery) => (
+                        <label key={delivery.id} className="flex items-center space-x-2 cursor-pointer p-2 rounded-md hover:bg-[#A3E5F5]/10">
+                            <input
+                            type="checkbox"
+                            checked={selected.has(delivery.id)}
+                            onChange={(e) => onSelectionChange(customer.customerCode, delivery.id, e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-400 bg-[#152C47] text-[#19BDE6] focus:ring-[#19BDE6]"
+                            />
+                            <span className="text-sm text-[#A3E5F5]">{delivery.id}</span>
+                        </label>
+                    ))}
+                    </div>
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        const CustomerList = ({ customers, selectedDeliveries, setSelectedDeliveries, highlightedCustomers }) => {
+          const handleSelectionChange = React.useCallback((customerId, deliveryId, isSelected) => {
+            setSelectedDeliveries(prev => {
+              const newMap = new Map(prev);
+              const deliverySet = new Set(newMap.get(customerId) || []);
+              if (isSelected) {
+                deliverySet.add(deliveryId);
+              } else {
+                deliverySet.delete(deliveryId);
+              }
+              newMap.set(customerId, deliverySet);
+              return newMap;
+            });
+          }, [setSelectedDeliveries]);
+
+          const handleSelectAll = React.useCallback((customerId, shouldSelectAll) => {
+            setSelectedDeliveries(prev => {
+                const newMap = new Map(prev);
+                const customer = customers.get(customerId);
+                if(!customer) return prev;
+
+                if (shouldSelectAll) {
+                    newMap.set(customerId, new Set(customer.deliveries.map(d => d.id)));
+                } else {
+                    newMap.set(customerId, new Set());
+                }
+                return newMap;
+            });
+          }, [customers, setSelectedDeliveries]);
+
+          return (
+            <div className="bg-[#2D5E98] p-6 rounded-lg shadow-md no-print">
+              <h3 className="text-xl font-semibold mb-4 text-white">Selección de Entregas por Cliente</h3>
+               {customers.size > 0 ? (
+                <div className="space-y-4">
+                  {Array.from(customers.values()).map((customer) => (
+                    <CustomerItem
+                      key={customer.customerCode}
+                      customer={customer}
+                      selected={selectedDeliveries.get(customer.customerCode) || new Set()}
+                      onSelectionChange={handleSelectionChange}
+                      onSelectAll={handleSelectAll}
+                      isHighlighted={highlightedCustomers.has(customer.customerCode)}
+                    />
+                  ))}
+                </div>
+               ) : (
+                <div className="text-center py-10 px-6 bg-[#152C47]/50 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-[#858A8C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                    <h3 className="mt-2 text-sm font-medium text-white">No hay entregas pendientes</h3>
+                    <p className="mt-1 text-sm text-[#A3E5F5]">¡Buen trabajo! Todas las entregas del archivo han sido despachadas.</p>
+                </div>
+               )}
+            </div>
+          );
+        };
+        
+        const SelectionDashboard = ({
+          customers,
+          selectedDeliveries,
+          setSelectedDeliveries,
+          formData,
+          setFormData,
+          onPreview,
+          isPreviewReady,
+          fileName,
+          highlightedCustomers,
+          generateAuditSheet,
+          setGenerateAuditSheet,
+        }) => {
+          return (
+            <div className="space-y-8">
+              <div className="bg-[#2D5E98] p-6 rounded-lg shadow-md no-print">
+                <h2 className="text-xl font-semibold mb-2 text-white">Archivo Cargado: <span className="text-[#A3E5F5] font-medium">{fileName}</span></h2>
+                <p className="text-[#A3E5F5]">
+                    {customers.size > 0 
+                    ? "Ahora, configure los detalles de la planilla y seleccione las entregas a incluir."
+                    : "Todas las entregas de este archivo ya han sido procesadas."}
+                </p>
+              </div>
+              <FormControls formData={formData} setFormData={setFormData} />
+              <CustomerList
+                customers={customers}
+                selectedDeliveries={selectedDeliveries}
+                setSelectedDeliveries={setSelectedDeliveries}
+                highlightedCustomers={highlightedCustomers}
+              />
+              <div className="flex justify-end items-center mt-8 no-print">
+                <label className="flex items-center space-x-3 mr-6 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={generateAuditSheet}
+                        onChange={(e) => setGenerateAuditSheet(e.target.checked)}
+                        className="h-5 w-5 rounded border-gray-400 bg-[#152C47] text-[#BACF00] focus:ring-[#BACF00] focus:ring-offset-2 focus:ring-offset-[#2D5E98]"
+                    />
+                    <span className="font-medium text-white select-none">Generar Planilla de Auditoría</span>
+                </label>
+                <button
+                  onClick={onPreview}
+                  disabled={!isPreviewReady}
+                  className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-bold rounded-md shadow-sm text-[#152C47] bg-[#BACF00] hover:bg-[#a7b900] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#152C47] focus:ring-[#BACF00] disabled:bg-[#858A8C] disabled:text-white/70 disabled:cursor-not-allowed"
+                >
+                  Generar Planilla
+                </button>
+              </div>
+               {!isPreviewReady && customers.size > 0 && (
+                 <div className="text-right text-sm text-yellow-900 bg-[#F1E519]/80 p-3 rounded-md mt-2 no-print font-semibold">
+                    <p>Por favor, complete todos los campos (Conductor, Vehículo) y seleccione al menos una entrega para continuar.</p>
+                </div>
+                )}
+            </div>
+          );
+        };
+
+        const DispatchPreviewPage = ({ rows, formData }) => (
+            <div className="dispatch-page bg-white p-4 shadow-lg mb-8 text-black">
+                <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
+                    <tbody>
+                        {/* Header Info */}
+                        <tr>
+                            <td rowSpan="4" colSpan="2" className="border border-black p-1 align-middle text-center">
+                                <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05="Logo" className="max-h-24 mx-auto" />
+                            </td>
+                            <td rowSpan="4" colSpan="6" className="border border-black p-1 align-middle text-center font-bold text-sm">FORMATO CONTROL RUTA URBANA PDC</td>
+                            <td colSpan="2" className="border border-black p-1">Código</td>
+                            <td colSpan="3" className="border border-black p-1">SL-FO-82</td>
+                        </tr>
+                        <tr>
+                            <td colSpan="2" className="border border-black p-1">Dependencia</td>
+                            <td colSpan="3" className="border border-black p-1">Servicios Logisticos</td>
+                        </tr>
+                        <tr>
+                            <td colSpan="2" className="border border-black p-1">Versión</td>
+                            <td colSpan="3" className="border border-black p-1">1</td>
+                        </tr>
+                        <tr>
+                            <td colSpan="2" className="border border-black p-1">Fecha</td>
+                            <td colSpan="3" className="border border-black p-1"></td>
+                        </tr>
+                        
+                        {/* Vehicle/Driver Info */}
+                        <tr>
+                            <td className="p-1 border border-black font-bold">TURNO</td>
+                            <td className="p-1 border border-black text-center">{formData.turno}</td>
+                            <td className="p-1 border border-black font-bold">FECHA</td>
+                            <td className="p-1 border border-black text-center" colSpan="2"></td>
+                            <td className="p-1 border border-black font-bold">TIPO DE VEHÍCULO</td>
+                            <td className="p-1 border border-black text-center" colSpan="1">{formData.vehiculo?.tipo || ''}</td>
+                            <td className="p-1 border border-black font-bold">MARCA</td>
+                            <td className="p-1 border border-black text-center">{formData.vehiculo?.marca || ''}</td>
+                            <td className="p-1 border border-black font-bold">PLACA</td>
+                            <td className="p-1 border border-black text-center">{formData.vehiculo?.placa || ''}</td>
+                            <td className="p-1 border border-black font-bold">CAPACIDAD</td>
+                            <td className="p-1 border border-black text-center">{formData.vehiculo?.capacidad || ''}</td>
+                        </tr>
+                        <tr>
+                            <td className="p-1 border border-black font-bold">RUTA</td>
+                            <td className="p-1 border border-black text-center">{formData.ruta}</td>
+                            <td className="p-1 border border-black font-bold">HORA DE SALIDA</td>
+                            <td className="p-1 border border-black text-center" colSpan="2"></td>
+                            <td className="p-1 border border-black font-bold" colSpan="2">NOMBRE DEL CONDUCTOR</td>
+                            <td className="p-1 border border-black text-center" colSpan="2">{formData.conductor?.nombre || ''}</td>
+                            <td className="p-1 border border-black font-bold">IDENTIFICACIÓN</td>
+                            <td className="p-1 border border-black text-center" colSpan="2">{formData.conductor?.cedula || ''}</td>
+                            <td colSpan="1" className="border-r border-black"></td>
+                        </tr>
+                        
+                        {/* Delivery Header */}
+                        <tr className="bg-gray-200 font-bold text-center">
+                            <td colSpan="13" className="p-2 border border-black">ENTREGA DE REPUESTOS</td>
+                        </tr>
+                        <tr className="bg-gray-100 font-bold text-center">
+                            <td className="p-1 border border-black align-middle" style={{width: '8%'}}>Centro Destino</td>
+                            <td className="p-1 border border-black align-middle" colSpan="2" style={{width: '15%'}}>Nombre Destinatario</td>
+                            <td className="p-1 border border-black align-middle" colSpan="2" style={{width: '15%'}}>N° Entrega<br/>Traslado</td>
+                            <td className="p-1 border border-black align-middle" style={{width: '7%'}}>N°<br/>Piezas</td>
+                            <td className="p-1 border border-black align-middle" style={{width: '7%'}}>N° Precinto</td>
+                            <td className="p-1 border border-black align-middle" style={{width: '7%'}}>Canastilla<br/>N°</td>
+                            <td className="p-1 border border-black align-middle" colSpan="3" style={{width: '25%'}}>Observaciones (vidrios, piezas sueltas, puertas, costados, bumpers)</td>
+                            <td className="p-1 border border-black align-middle" colSpan="2" style={{width: '16%'}}>Recibido</td>
+                        </tr>
+
+                        {/* Delivery Data Rows */}
+                        {rows.map(row => (
+                            <tr key={row.customerCode} style={row.selectedDeliveries.length < 8 ? { height: '96px' } : {}}>
+                                <td className="p-1 border border-black text-center align-top">{row.customerCode}</td>
+                                <td className="p-1 border border-black text-center align-top" colSpan="2">{row.customerName}</td>
+                                <td className="p-1 border border-black text-center align-top whitespace-pre-wrap font-mono" colSpan="2" style={{ fontSize: '11px' }}>
+                                    {Array.from({ length: Math.ceil(row.selectedDeliveries.length / 2) })
+                                        .map((_, index) => {
+                                            const i = index * 2;
+                                            const first = row.selectedDeliveries[i];
+                                            const second = row.selectedDeliveries[i + 1];
+                                            if (second) {
+                                                return `${first} - ${second}`;
+                                            }
+                                            return first;
+                                        })
+                                        .join('\n')}
+                                </td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black" colSpan="3"></td>
+                                <td className="p-1 border border-black" colSpan="2"></td>
+                            </tr>
+                        ))}
+                        {Array.from({ length: Math.max(0, DELIVERIES_PER_PAGE - rows.length) }).map((_, i) => (
+                            <tr key={`empty-${i}`} style={{height: '32px'}}>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black" colSpan="2"></td>
+                                <td className="p-1 border border-black" colSpan="2"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black" colSpan="3"></td>
+                                <td className="p-1 border border-black" colSpan="2"></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+        
+        const AuditPage1 = ({ rows }) => {
+            const numEmptyRows = Math.max(0, AUDIT_DELIVERIES_PER_PAGE - rows.length);
+            return (
+            <div className="dispatch-page bg-white p-4 shadow-lg mb-8 text-black">
+                <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
+                    <tbody>
+                        {/* Header Info */}
+                        <tr>
+                            <td rowSpan="4" colSpan="2" className="border border-black p-1 align-middle text-center">
+                                <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05" alt="Logo" className="max-h-16 mx-auto" />
+                            </td>
+                            <td rowSpan="4" colSpan="5" className="border border-black p-1 align-middle text-center font-bold text-base">FORMATO AUDITORIA INSPECCIÓN SALIDA DE REPUESTOS<br/>NACIONAL Y LOCAL</td>
+                            <td className="border border-black p-1 font-bold">Código</td>
+                            <td className="border border-black p-1 text-center">SL-FO-81</td>
+                        </tr>
+                        <tr>
+                            <td className="border border-black p-1 font-bold">Dependencia</td>
+                            <td className="border border-black p-1 text-center">Servicios Logisticos</td>
+                        </tr>
+                        <tr>
+                            <td className="border border-black p-1 font-bold">Versión</td>
+                            <td className="border border-black p-1 text-center">1</td>
+                        </tr>
+                        <tr>
+                            <td className="border border-black p-1 font-bold">Fecha</td>
+                            <td className="border border-black p-1 text-center">21/09/2023</td>
+                        </tr>
+                        
+                        {/* START: Rebuilt Header Section */}
+                        <tr>
+                            <td colSpan="9" className="p-0 align-top">
+                                <table className="w-full border-collapse border-black text-xs">
+                                    <tbody>
+                                        <tr className="font-bold text-center bg-gray-100">
+                                            <td className="p-1 border-t border-l border-b border-black" colSpan="2">RUTA</td>
+                                            <td className="p-1 border-t border-b border-x border-black" colSpan="2">INICIO INSPECCIÓN</td>
+                                            <td className="p-1 border-t border-b border-r border-black" colSpan="2">FIN INSPECCIÓN</td>
+                                            <td className="p-1 border-t border-b border-r border-black" colSpan="2">LUGAR DE INSPECCIÓN</td>
+                                            <td className="p-1 border-t border-b border-r border-black" colSpan="4">RESPONSABLE DE INSPECCIÓN</td>
+                                        </tr>
+                                        <tr>
+                                            {/* RUTA */}
+                                            <td className="p-1 border-l border-b border-r border-black font-bold" style={{width: '12%'}}>NACIONAL</td>
+                                            <td className="p-1 border-b border-r border-black" style={{width: '8%'}}></td>
+                                            {/* INICIO */}
+                                            <td className="p-1 border-b border-l border-black font-bold" style={{width: '6%'}}>FECHA</td>
+                                            <td className="p-1 border-b border-r border-black" style={{width: '8%'}}></td>
+                                            {/* FIN */}
+                                            <td className="p-1 border-b border-black font-bold" style={{width: '6%'}}>FECHA</td>
+                                            <td className="p-1 border-b border-r border-black" style={{width: '8%'}}></td>
+                                            {/* LUGAR */}
+                                            <td className="p-1 border-b border-black font-bold" style={{width: '6%'}}>CENTRO</td>
+                                            <td className="p-1 border-b border-r border-black" style={{width: '8%'}}></td>
+                                            {/* RESPONSABLE 1 */}
+                                            <td className="p-1 border-b border-black font-bold" style={{width: '6%'}}>NOMBRE</td>
+                                            <td className="p-1 border-b border-r border-black" style={{width: '8%'}}></td>
+                                            {/* RESPONSABLE 2 */}
+                                            <td className="p-1 border-b border-black font-bold" style={{width: '6%'}}>NOMBRE</td>
+                                            <td className="p-1 border-b border-r border-black" style={{width: '8%'}}></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-1 border-l border-b border-r border-black font-bold">MANIFIESTO NO.</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-l border-black font-bold">HORA</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-black font-bold">HORA</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-black font-bold">NOMBRE</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-black font-bold">CARGO</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-black font-bold">CARGO</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-1 border-l border-b border-r border-black font-bold">LOCAL</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-l border-black font-bold">TIPO DE VEHICULO</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-black font-bold">MARCA</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-black font-bold">MODELO</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-black font-bold">PLACA DE VEHICULO</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                            <td className="p-1 border-b border-black font-bold">CAPACIDAD</td>
+                                            <td className="p-1 border-b border-r border-black"></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-1 border-l border-b border-black font-bold" colSpan="2">NOMBRE DEL CONDUCTOR</td>
+                                            <td className="p-1 border-b border-r border-black" colSpan="6"></td>
+                                            <td className="p-1 border-b border-black font-bold" colSpan="2">IDENTIFICACIÓN</td>
+                                            <td className="p-1 border-b border-r border-black" colSpan="2"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                        {/* END: Rebuilt Header Section */}
+
+                        {/* Delivery Header */}
+                        <tr className="bg-gray-200 font-bold text-center">
+                            <td colSpan="9" className="p-2 border border-black">ENTREGA DE REPUESTOS</td>
+                        </tr>
+                        <tr className="bg-gray-100 font-bold text-center align-middle">
+                            <td className="p-1 border border-black" style={{width: '12%'}}>Centro Destino</td>
+                            <td className="p-1 border border-black" style={{width: '18%'}}>N° Entrega Traslado</td>
+                            <td className="p-1 border border-black" style={{width: '7%'}}>N° Piezas</td>
+                            <td className="p-1 border border-black" style={{width: '7%'}}>N° Precinto</td>
+                            <td className="p-1 border border-black" colSpan="2" style={{width: '10%'}}>Delicado</td>
+                            <td className="p-1 border border-black" style={{width: '30%'}}>Observaciones</td>
+                            <td className="p-1 border border-black" colSpan="2" style={{width: '16%'}}>Firma recibido</td>
+                        </tr>
+                        <tr className="bg-gray-100 font-bold text-center">
+                            <td className="p-1 border-r border-b border-black"></td>
+                            <td className="p-1 border-r border-b border-black"></td>
+                            <td className="p-1 border-r border-b border-black"></td>
+                            <td className="p-1 border-r border-b border-black"></td>
+                            <td className="p-1 border-b border-black">SI</td>
+                            <td className="p-1 border-r border-b border-black">NO</td>
+                            <td className="p-1 border-r border-b border-black"></td>
+                            <td className="p-1 border-r border-b border-black" colSpan="2"></td>
+                        </tr>
+                        
+                        {/* Delivery Data Rows */}
+                        {rows.map((row, index) => (
+                             <tr key={row.customerCode} style={row.selectedDeliveries.length < 8 ? { height: '72px' } : {}}>
+                                <td className="p-1 border border-black text-center align-top">{row.customerCode}</td>
+                                <td className="p-1 border border-black text-center align-top whitespace-pre-wrap font-mono" style={{ fontSize: '9px' }}>
+                                    {Array.from({ length: Math.ceil(row.selectedDeliveries.length / 2) })
+                                        .map((_, index) => {
+                                            const i = index * 2;
+                                            const first = row.selectedDeliveries[i];
+                                            const second = row.selectedDeliveries[i + 1];
+                                            if (second) {
+                                                return `${first} - ${second}`;
+                                            }
+                                            return first;
+                                        })
+                                        .join('\n')}
+                                </td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border-l border-b border-black"></td>
+                                <td className="p-1 border-x border-b border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className={`p-1 border-l border-r border-black ${numEmptyRows === 0 && index === rows.length - 1 ? 'border-b': ''}`} colSpan="2"></td>
+                            </tr>
+                        ))}
+                        {Array.from({ length: numEmptyRows }).map((_, i) => (
+                           <tr key={`empty-audit-${i}`} style={{height: '24px'}}>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border-l border-b border-black"></td>
+                                <td className="p-1 border-x border-b border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className={`p-1 border-l border-r border-black ${i === numEmptyRows - 1 ? 'border-b': ''}`} colSpan="2"></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            );
+        };
+
+        const AuditPage2 = () => (
+            <div className="dispatch-page bg-white p-4 shadow-lg text-black">
+                <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
+                    <tbody>
+                        {/* Header Info */}
+                        <tr>
+                            <td rowSpan="4" colSpan="2" className="border border-black p-1 align-middle text-center">
+                                <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05" alt="Logo" className="max-h-16 mx-auto" />
+                            </td>
+                            <td rowSpan="4" colSpan="5" className="border border-black p-1 align-middle text-center font-bold text-base">FORMATO AUDITORIA INSPECCIÓN SALIDA DE REPUESTOS<br/>NACIONAL Y LOCAL</td>
+                            <td className="border border-black p-1 font-bold">Código</td>
+                            <td className="border border-black p-1 text-center">SL-FO-81</td>
+                        </tr>
+                        <tr>
+                            <td className="border border-black p-1 font-bold">Dependencia</td>
+                            <td className="border border-black p-1 text-center">Servicios Logisticos</td>
+                        </tr>
+                        <tr>
+                            <td className="border border-black p-1 font-bold">Versión</td>
+                            <td className="border border-black p-1 text-center">1</td>
+                        </tr>
+                        <tr>
+                            <td className="border border-black p-1 font-bold">Fecha</td>
+                            <td className="border border-black p-1 text-center">21/09/2023</td>
+                        </tr>
+                        
+                        {/* Document Delivery */}
+                        <tr className="bg-gray-200 font-bold text-center">
+                            <td colSpan="9" className="p-2 border border-black">ENTREGA DE DOCUMENTOS</td>
+                        </tr>
+                        <tr className="bg-gray-100 font-bold text-center" style={{height: '30px'}}>
+                            <td className="p-1 border border-black">Sucursal</td>
+                            <td className="p-1 border border-black">De</td>
+                            <td className="p-1 border border-black">Para</td>
+                            <td className="p-1 border border-black" colSpan="4">Observaciones</td>
+                            <td className="p-1 border border-black" colSpan="2">Firma recibido</td>
+                        </tr>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <tr key={`doc-${i}`} style={{height: '24px'}}>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black" colSpan="4"></td>
+                                <td className="p-1 border border-black" colSpan="2"></td>
+                            </tr>
+                        ))}
+
+                        {/* Vehicle Inspection */}
+                        <tr className="bg-gray-200 font-bold text-center">
+                            <td colSpan="9" className="p-2 border border-black">INSPECCION CONDICIONES FISICAS INTERNAS FURGÓN DEL VEHICULO</td>
+                        </tr>
+                        <tr className="bg-gray-100 font-bold text-center">
+                            <td className="p-1 border border-black" colSpan="5">ESTADO FURGON INTERNO</td>
+                            <td className="p-1 border border-black">CUMPLE</td>
+                            <td className="p-1 border border-black">NO CUMPLE</td>
+                            <td className="p-1 border border-black" colSpan="2">OBSERVACIONES</td>
+                        </tr>
+                        {[
+                            'El piso del furgon esta en buen estado',
+                            'Las paredes internas el furgon estan en buen estado',
+                            'Las paredes externas el furgon estan en buen estado',
+                            'Inexistencia de sustancias o elementos ilicitos en espacios vacios',
+                            'Puertas en buen estado y ajustadas',
+                            'Evidencias fotograficas: Solo aplica, cuando se evidencia una novedad',
+                            'Orden y aseo dentro el furgon'
+                        ].map((item, i) => (
+                            <tr key={`inspect-${i}`} style={{height: '24px'}}>
+                                <td className="p-1 px-2 border border-black text-left" colSpan="5">{item}</td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black"></td>
+                                <td className="p-1 border border-black" colSpan="2"></td>
+                            </tr>
+                        ))}
+
+                        {/* Signatures */}
+                        <tr className="bg-gray-200 font-bold text-center">
+                            <td colSpan="9" className="p-2 border border-black">RESPONSABLES DE LA INSPECCIÓN</td>
+                        </tr>
+                        <tr style={{height: '24px'}}>
+                            <td className="p-1 border-l border-r border-black font-bold text-center" colSpan="4">QUIEN ENTREGA:</td>
+                            <td className="p-1 border-r border-black font-bold text-center" colSpan="5">QUIEN RECIBE:</td>
+                        </tr>
+                        <tr style={{height: '24px'}}>
+                            <td className="p-1 border-l border-black font-bold">Nombre</td>
+                            <td className="p-1 border-r border-black" colSpan="3"></td>
+                            <td className="p-1 font-bold">Nombre</td>
+                            <td className="p-1 border-r border-black" colSpan="4"></td>
+                        </tr>
+                         <tr style={{height: '24px'}}>
+                            <td className="p-1 border-l border-black font-bold">Cargo</td>
+                            <td className="p-1 border-r border-black" colSpan="3"></td>
+                            <td className="p-1 font-bold">Identificación</td>
+                            <td className="p-1 border-r border-black" colSpan="4"></td>
+                        </tr>
+                        <tr style={{height: '24px'}}>
+                            <td className="p-1 border-l border-b border-black font-bold">Firma</td>
+                            <td className="p-1 border-r border-b border-black" colSpan="3"></td>
+                            <td className="p-1 border-b border-black font-bold">Firma</td>
+                            <td className="p-1 border-r border-b border-black" colSpan="4"></td>
+                        </tr>
+                        <tr>
+                            <td className="p-1 border-l border-r border-b border-black" colSpan="9" style={{height: '48px'}}><span className="font-bold">Observaciones:</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        );
+
+
+        const DispatchPreview = ({ customers, selectedDeliveries, formData, onBack, onFinalize, generateAuditSheet }) => {
+            const deliveryRows = React.useMemo(() => {
+                const rows = [];
+                selectedDeliveries.forEach((deliveryIds, customerCode) => {
+                    if (deliveryIds.size > 0) {
+                        const customerData = customers.get(customerCode);
+                        if (customerData) {
+                            rows.push({
+                                ...customerData,
+                                selectedDeliveries: Array.from(deliveryIds).sort((a, b) => String(a).localeCompare(String(b))),
+                            });
+                        }
+                    }
+                });
+                return rows;
+            }, [customers, selectedDeliveries]);
+
+            const pages = React.useMemo(() => {
+                const numPages = Math.ceil(deliveryRows.length / DELIVERIES_PER_PAGE);
+                return Array.from({ length: numPages }, (_, i) => {
+                    const start = i * DELIVERIES_PER_PAGE;
+                    const end = start + DELIVERIES_PER_PAGE;
+                    return deliveryRows.slice(start, end);
+                });
+            }, [deliveryRows]);
+
+            const auditPages = React.useMemo(() => {
+                if (!generateAuditSheet) return [];
+                const numPages = Math.ceil(deliveryRows.length / AUDIT_DELIVERIES_PER_PAGE);
+                return Array.from({ length: numPages > 0 ? numPages : 1 }, (_, i) => {
+                    const start = i * AUDIT_DELIVERIES_PER_PAGE;
+                    const end = start + AUDIT_DELIVERIES_PER_PAGE;
+                    return deliveryRows.slice(start, end);
+                });
+            }, [deliveryRows, generateAuditSheet]);
+
+            const handlePrintAndFinalize = () => {
+                const afterPrintHandler = () => {
+                    onFinalize();
+                    window.removeEventListener('afterprint', afterPrintHandler);
+                };
+                window.addEventListener('afterprint', afterPrintHandler);
+                window.print();
+            };
+
+            return (
+                <div className="bg-[#2D5E98] p-6 rounded-lg shadow-2xl dispatch-preview-container">
+                    <div className="flex justify-between items-center mb-6 no-print">
+                        <h2 className="text-2xl font-bold text-white">Vista Previa de la Planilla</h2>
+                        <div className="flex items-center space-x-4">
+                             <button onClick={handlePrintAndFinalize} className="px-4 py-2 text-sm font-bold text-[#152C47] bg-[#BACF00] rounded-md hover:bg-[#a7b900] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#152C47] focus:ring-[#BACF00]">
+                                Imprimir
+                            </button>
+                            <button onClick={onBack} className="px-4 py-2 text-sm font-medium text-white bg-[#858A8C] rounded-md hover:bg-[#6c7072] focus:outline-none">
+                                Volver a Editar
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* --- Delivery Pages --- */}
+                    {pages.map((pageRows, index) => (
+                        <DispatchPreviewPage key={`page-${index}`} rows={pageRows} formData={formData} />
+                    ))}
+
+                    {/* --- PAGE 2 (Inspection) --- */}
+                    <div className="dispatch-page bg-white p-4 shadow-lg text-black">
+                        <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
+                            <tbody>
+                                {/* Header Info */}
+                                <tr>
+                                    <td rowSpan="4" colSpan="2" className="border border-black p-1 align-middle text-center">
+                                        <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05" alt="Logo" className="max-h-24 mx-auto" />
+                                    </td>
+                                    <td rowSpan="4" colSpan="6" className="border border-black p-1 align-middle text-center font-bold text-sm">FORMATO CONTROL RUTA URBANA PDC</td>
+                                    <td colSpan="2" className="border border-black p-1">Código</td>
+                                    <td colSpan="3" className="border border-black p-1">SL-FO-82</td>
+                                </tr>
+                                <tr>
+                                    <td colSpan="2" className="border border-black p-1">Dependencia</td>
+                                    <td colSpan="3" className="border border-black p-1">Servicios Logisticos</td>
+                                </tr>
+                                <tr>
+                                    <td colSpan="2" className="border border-black p-1">Versión</td>
+                                    <td colSpan="3" className="border border-black p-1">1</td>
+                                </tr>
+                                <tr>
+                                    <td colSpan="2" className="border border-black p-1">Fecha</td>
+                                    <td colSpan="3" className="border border-black p-1"></td>
+                                </tr>
+                                
+                                {/* Document Delivery */}
+                                <tr className="bg-gray-200 font-bold text-center">
+                                    <td colSpan="13" className="p-2 border border-black">ENTREGA DE DOCUMENTOS</td>
+                                </tr>
+                                <tr className="bg-gray-100 font-bold text-center" style={{height: '40px'}}>
+                                    <td className="p-1 border border-black" colSpan="2">Centro destino</td>
+                                    <td className="p-1 border border-black">De</td>
+                                    <td className="p-1 border border-black" colSpan="4">Tipo de Documento (factura, improntas, importaciones, no reporta)</td>
+                                    <td className="p-1 border border-black" colSpan="3">Nombre quien recibe</td>
+                                    <td className="p-1 border border-black" colSpan="3">Firma de recibido</td>
+                                </tr>
+                                {Array.from({ length: 2 }).map((_, i) => (
+                                    <tr key={`doc-${i}`} style={{height: '24px'}}>
+                                        <td className="p-1 border border-black" colSpan="2"></td>
+                                        <td className="p-1 border border-black"></td>
+                                        <td className="p-1 border border-black" colSpan="4"></td>
+                                        <td className="p-1 border border-black" colSpan="3"></td>
+                                        <td className="p-1 border border-black" colSpan="3"></td>
+                                    </tr>
+                                ))}
+
+                                {/* Cargo Transfer */}
+                                <tr className="bg-gray-200 font-bold text-center">
+                                    <td colSpan="13" className="p-2 border border-black">MERCANCIA DE TRASLADO</td>
+                                </tr>
+                                <tr className="bg-gray-100 font-bold text-center" style={{height: '40px'}}>
+                                    <td className="p-1 border border-black" colSpan="2">Centro destino</td>
+                                    <td className="p-1 border border-black">De</td>
+                                    <td className="p-1 border border-black" colSpan="4">Tipo de Documento (factura, improntas, importaciones, no reporta)</td>
+                                    <td className="p-1 border border-black" colSpan="3">Nombre quien recibe</td>
+                                    <td className="p-1 border border-black" colSpan="3">Firma de recibido</td>
+                                </tr>
+                                {Array.from({ length: 2 }).map((_, i) => (
+                                    <tr key={`cargo-${i}`} style={{height: '24px'}}>
+                                        <td className="p-1 border border-black" colSpan="2"></td>
+                                        <td className="p-1 border border-black"></td>
+                                        <td className="p-1 border border-black" colSpan="4"></td>
+                                        <td className="p-1 border border-black" colSpan="3"></td>
+                                        <td className="p-1 border border-black" colSpan="3"></td>
+                                    </tr>
+                                ))}
+
+                                {/* Vehicle Inspection */}
+                                <tr className="bg-gray-200 font-bold text-center">
+                                    <td colSpan="13" className="p-2 border border-black">INSPECCION CONDICIONES FISICAS INTERNAS FURGÓN DEL VEHICULO</td>
+                                </tr>
+                                <tr className="bg-gray-100 font-bold text-center">
+                                    <td className="p-1 border border-black" colSpan="7">ESTADO FURGON INTERNO</td>
+                                    <td className="p-1 border border-black" colSpan="2">NO CUMPLE</td>
+                                    <td className="p-1 border border-black" colSpan="4">OBSERVACIONES</td>
+                                </tr>
+                                {[
+                                    'El piso del furgón está en buen estado',
+                                    'Las paredes internas el furgón están en buen estado',
+                                    'Las paredes externas el furgón están en buen estado',
+                                    'Inexistencia de sustancias o elementos ilícitos en espacios vacíos',
+                                    'Puertas en buen estado y ajustadas',
+                                    'Evidencias fotográficas: Solo aplica cuando se evidencia una novedad',
+                                    'Orden y aseo dentro del furgón'
+                                ].map((item, i) => (
+                                    <tr key={`inspect-${i}`} style={{height: '24px'}}>
+                                        <td className="p-1 px-2 border border-black text-left" colSpan="7">{item}</td>
+                                        <td className="p-1 border border-black" colSpan="2"></td>
+                                        <td className="p-1 border border-black" colSpan="4"></td>
+                                    </tr>
+                                ))}
+
+                                {/* Signatures */}
+                                <tr style={{height: '24px'}}>
+                                    <td className="p-1 border border-black font-bold text-center" colSpan="7">QUIEN ENTREGA:</td>
+                                    <td className="p-1 border border-black font-bold text-center" colSpan="6">QUIEN RECIBE:</td>
+                                </tr>
+                                <tr style={{height: '24px'}}>
+                                    <td className="p-1 border-l border-black font-bold">Nombre</td>
+                                    <td className="p-1 border-r border-black" colSpan="6"></td>
+                                    <td className="p-1 border-r border-black font-bold">Nombre</td>
+                                    <td className="p-1 border-r border-black" colSpan="5"></td>
+                                </tr>
+                                <tr style={{height: '24px'}}>
+                                    <td className="p-1 border-l border-black font-bold">Cargo</td>
+                                    <td className="p-1 border-r border-black" colSpan="6"></td>
+                                    <td className="p-1 border-r border-black font-bold">Cargo</td>
+                                    <td className="p-1 border-r border-black" colSpan="5"></td>
+                                </tr>
+                                <tr style={{height: '24px'}}>
+                                    <td className="p-1 border-l border-b border-black font-bold">Firma</td>
+                                    <td className="p-1 border-r border-b border-black" colSpan="6"></td>
+                                    <td className="p-1 border-r border-b border-black font-bold">Firma</td>
+                                    <td className="p-1 border-r border-b border-black" colSpan="5"></td>
+                                </tr>
+                                <tr style={{height: '48px'}}>
+                                    <td className="p-1 border-l border-r border-b border-black" colSpan="13"><span className="font-bold">Observaciones Finales:</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {/* --- AUDIT PAGES --- */}
+                    {generateAuditSheet && (
+                        <div className="print-new-page">
+                            {auditPages.map((pageRows, index) => (
+                                <AuditPage1 key={`audit-p1-${index}`} rows={pageRows} />
+                            ))}
+                            {generateAuditSheet && <AuditPage2 />}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        
+        // --- MAIN APP ---
+        const App = () => {
+          const { useState, useCallback, useMemo } = React;
+          const [masterCustomerList, setMasterCustomerList] = useState(null);
+          const [groupedCustomers, setGroupedCustomers] = useState(null);
+          const [selectedDeliveries, setSelectedDeliveries] = useState(new Map());
+          const [highlightedCustomers, setHighlightedCustomers] = useState(new Set());
+          const [generateAuditSheet, setGenerateAuditSheet] = useState(false);
+          
+          const initialFormData = {
+            turno: 'AM',
+            ruta: 'Centro',
+            conductor: null,
+            vehiculo: null,
+          };
+          const [formData, setFormData] = useState(initialFormData);
+
+          const [view, setView] = useState('upload');
+          const [error, setError] = useState(null);
+          const [fileName, setFileName] = useState('');
+
+          const processFile = useCallback((file) => {
+            setFileName(file.name);
+            setError(null);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const rawJsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                const findHeader = (row, targetHeader) => {
+                    if (!row) return null;
+                    const normalizedTarget = targetHeader.toLowerCase().trim().replace(/\s+/g, ' ');
+                    for (const key in row) {
+                        if (key.toLowerCase().trim().replace(/\s+/g, ' ') === normalizedTarget) {
+                            return key;
+                        }
+                    }
+                    return null;
+                };
+
+                if (rawJsonData.length === 0) throw new Error("El archivo Excel está vacío.");
+                
+                const firstRow = rawJsonData[0];
+                const deliveryHeader = findHeader(firstRow, 'Entrega');
+                const customerCodeHeader = findHeader(firstRow, 'Destinatario mcía.');
+                const customerNameHeader = findHeader(firstRow, 'Nombre destinatario de mercancías');
+
+                if (!deliveryHeader || !customerCodeHeader || !customerNameHeader) {
+                    let missing = [
+                        !deliveryHeader ? "'Entrega'" : null,
+                        !customerCodeHeader ? "'Destinatario mcía.'" : null,
+                        !customerNameHeader ? "'Nombre destinatario de mercancías'" : null
+                    ].filter(Boolean).join(', ');
+                    throw new Error(`No se encontraron las columnas requeridas: ${missing}.`);
+                }
+
+                const customers = new Map();
+                
+                rawJsonData.forEach(row => {
+                  const customerCode = String(row[customerCodeHeader]);
+                  const customerName = row[customerNameHeader];
+                  const deliveryId = row[deliveryHeader];
+
+                  if (!customerCode || !customerName || deliveryId === undefined || customerCode.toLowerCase() === 'undefined') {
+                     return;
+                  }
+
+                  if (!customers.has(customerCode)) {
+                    customers.set(customerCode, {
+                      customerCode,
+                      customerName,
+                      deliveries: []
+                    });
+                  }
+
+                  const existingCustomer = customers.get(customerCode);
+                  let existingDelivery = existingCustomer.deliveries.find(d => d.id === deliveryId);
+
+                  if (!existingDelivery) {
+                      existingDelivery = { id: deliveryId };
+                      existingCustomer.deliveries.push(existingDelivery);
+                  }
+                });
+                
+                customers.forEach(customer => {
+                    customer.deliveries.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+                });
+                
+                if (customers.size === 0) {
+                    throw new Error("No se pudo agrupar ningún cliente. Verifique los datos.");
+                }
+                
+                setMasterCustomerList(customers);
+                setGroupedCustomers(customers);
+                setSelectedDeliveries(new Map());
+                setView('dashboard');
+              } catch (err) {
+                console.error("Error processing file:", err);
+                setError(err.message || "Error al procesar el archivo.");
+                setView('upload');
+              }
+            };
+            reader.onerror = () => {
+                setError("No se pudo leer el archivo.");
+                setView('upload');
+            };
+            reader.readAsBinaryString(file);
+          }, []);
+
+          const handleReset = () => {
+            setMasterCustomerList(null);
+            setGroupedCustomers(null);
+            setSelectedDeliveries(new Map());
+            setFormData(initialFormData);
+            setFileName('');
+            setError(null);
+            setGenerateAuditSheet(false);
+            setView('upload');
+          };
+          
+          const handleGeneratePreview = () => {
+              setHighlightedCustomers(new Set());
+              setView('preview');
+          };
+
+          const handleBackToEdit = () => {
+            const partialSelections = new Set();
+            if (groupedCustomers) {
+                groupedCustomers.forEach(customer => {
+                    const selectedIds = selectedDeliveries.get(customer.customerCode);
+                    if (selectedIds && selectedIds.size > 0 && selectedIds.size < customer.deliveries.length) {
+                        partialSelections.add(customer.customerCode);
+                    }
+                });
+            }
+            setHighlightedCustomers(partialSelections);
+            setView('dashboard');
+          };
+          
+          const handleFinalizeAndReset = () => {
+                const newGroupedCustomers = new Map(JSON.parse(JSON.stringify(Array.from(groupedCustomers))));
+
+                selectedDeliveries.forEach((deliveryIds, customerCode) => {
+                    if (newGroupedCustomers.has(customerCode) && deliveryIds.size > 0) {
+                        const customer = newGroupedCustomers.get(customerCode);
+                        customer.deliveries = customer.deliveries.filter(d => !deliveryIds.has(d.id));
+                        
+                        if (customer.deliveries.length === 0) {
+                            newGroupedCustomers.delete(customerCode);
+                        } else {
+                            newGroupedCustomers.set(customerCode, customer);
+                        }
+                    }
+                });
+
+                setGroupedCustomers(newGroupedCustomers);
+                setMasterCustomerList(newGroupedCustomers);
+                setSelectedDeliveries(new Map());
+                setView('dashboard');
+            };
+
+          const isPreviewReady = useMemo(() => {
+            const hasSelection = Array.from(selectedDeliveries.values()).some(set => set.size > 0);
+            return hasSelection && formData.conductor && formData.vehiculo;
+          }, [selectedDeliveries, formData]);
+
+          return (
+            <div className="min-h-screen bg-[#152C47] text-white">
+              <header className="bg-black/20 shadow-lg no-print">
+                <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                  <h1 className="text-2xl font-bold text-white flex items-center">
+                    <img src="https://inchcapeuk.sharepoint.com/:i:/r/sites/LogisticaCol/Documentos%20compartidos/PDC%20CLIS/Inchcape.png?csf=1&web=1&e=6o0g05" alt="Logo de la empresa" className="h-16 w-auto mr-4" />
+                    Generador de Planillas de Despacho
+                  </h1>
+                  {view !== 'upload' && (
+                     <button
+                      onClick={handleReset}
+                      className="px-4 py-2 text-sm font-medium text-white bg-[#A461AB] border border-transparent rounded-md shadow-sm hover:bg-[#8e5292] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#152C47] focus:ring-[#A461AB]"
+                    >
+                      Empezar de Nuevo
+                    </button>
+                  )}
+                </div>
+              </header>
+
+              <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+                {view === 'upload' && <FileUpload onFileUpload={processFile} error={error} />}
+                
+                {view === 'dashboard' && groupedCustomers && (
+                  <SelectionDashboard
+                    customers={groupedCustomers}
+                    selectedDeliveries={selectedDeliveries}
+                    setSelectedDeliveries={setSelectedDeliveries}
+                    formData={formData}
+                    setFormData={setFormData}
+                    onPreview={handleGeneratePreview}
+                    isPreviewReady={isPreviewReady}
+                    fileName={fileName}
+                    highlightedCustomers={highlightedCustomers}
+                    generateAuditSheet={generateAuditSheet}
+                    setGenerateAuditSheet={setGenerateAuditSheet}
+                  />
+                )}
+
+                {view === 'preview' && groupedCustomers && (
+                  <DispatchPreview
+                    customers={groupedCustomers}
+                    selectedDeliveries={selectedDeliveries}
+                    formData={formData}
+                    onBack={handleBackToEdit}
+                    onFinalize={handleFinalizeAndReset}
+                    generateAuditSheet={generateAuditSheet}
+                  />
+                )}
+              </main>
+            </div>
+          );
+        };
+
+        // --- RENDER APP ---
+        const rootElement = document.getElementById('root');
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
