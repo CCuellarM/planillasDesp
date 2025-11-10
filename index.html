@@ -540,7 +540,7 @@
                             </tr>
                         ))}
                         {Array.from({ length: Math.max(0, DELIVERIES_PER_PAGE - rows.length) }).map((_, i) => (
-                            <tr key={`empty-${i}`} style={{height: '32px'}}>
+                            <tr key={`empty-${i}`} style={{height: '90px'}}>
                                 <td className="p-1 border border-black"></td>
                                 <td className="p-1 border border-black" colSpan="2"></td>
                                 <td className="p-1 border border-black" colSpan="2"></td>
@@ -1303,4 +1303,5 @@
 
     </script>
 </body>
+
 </html>
