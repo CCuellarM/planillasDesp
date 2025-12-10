@@ -11,27 +11,48 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        /* ESTILOS DE IMPRESIÓN OPTIMIZADOS PARA TABLET */
+        /* ESTILOS DE IMPRESIÓN OPTIMIZADOS PARA TABLET - Nivel de Agresividad Extrema */
         @media print {
+            /* 1. Resetear el control de color de la impresora */
+            html, body {
+                -webkit-print-color-adjust: exact !important; /* CRÍTICO para Chrome/Android */
+                print-color-adjust: exact !important; /* Estándar */
+            }
+
             @page {
                 size: auto;
                 margin: 5mm;
             }
 
-            /* Forzar reseteo total de colores */
+            /* 2. Forzar reseteo TOTAL de colores y fondos en CADA elemento */
+            *, *::before, *::after, 
             body, #root, main, div, span, p, td, th, li, h1, h2, h3 {
-                background-color: transparent !important;
-                color: #000000 !important;
+                background: #ffffff !important; /* Fondo blanco */
+                background-color: #ffffff !important; /* Fondo blanco */
+                color: #000000 !important; /* Letra negra */
+                border-color: #000000 !important; /* Bordes negros */
                 text-shadow: none !important;
                 box-shadow: none !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+            }
+            
+            /* 3. Re-Aplicar bordes necesarios */
+            table, td, th {
+                border-color: #000000 !important;
+                border-collapse: collapse !important;
             }
 
-            /* Ocultar interfaz de usuario */
+
+            /* 4. Ocultar interfaz de usuario */
             .no-print, header, button {
                 display: none !important;
+                visibility: hidden !important;
+                height: 0 !important;
+                overflow: hidden !important;
             }
 
-            /* Ajustes estructurales para evitar hojas en blanco */
+            /* 5. Ajustes estructurales para evitar hojas en blanco */
             html, body {
                 width: 100%;
                 height: auto;
@@ -40,12 +61,12 @@
                 overflow: visible !important;
             }
 
-            /* Permitir que la tabla se ajuste al ancho del papel (CRÍTICO PARA TABLETS) */
+            /* 6. Permitir que la tabla se ajuste al ancho del papel (CRÍTICO PARA TABLETS) */
             table {
                 width: 100% !important;
-                min-width: 0 !important; /* Elimina la restricción de 1000px */
+                min-width: 0 !important; 
                 table-layout: auto !important;
-                font-size: 10px !important; /* Reducir fuente para que quepa */
+                font-size: 10px !important; 
             }
 
             .dispatch-page {
@@ -60,6 +81,12 @@
             /* Asegurar bordes visibles */
             td, th {
                 border: 1px solid #000 !important;
+            }
+            
+            /* Asegurar que las imágenes (como el logo) se muestren */
+            img {
+                filter: none !important;
+                display: block !important;
             }
         }
     </style>
@@ -82,7 +109,7 @@
         // --- Supabase Client ---
         const { createClient } = supabase;
         const supabaseUrl = 'https://uemerxsdwrygafqmwvdz.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlbWVyeHNkd3J5Z2FmcW13dmR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEyNDY2MjgsImV4cCI6MjA3NjgyMjYyOH0.F35Dj1qUxPDQlSdz82KAeH6wGIz_uDYCZpoeJs0LC-c';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlbWVyeHNkd3J5Z2FmcW13dmR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEyNDY2MjgsImV4cCI6MjA3NjgyMjY2MX0.F35Dj1qUxPDQlSdz82KAeH6wGIz_uDYCZpoeJs0LC-c';
         const supabaseClient = createClient(supabaseUrl, supabaseKey);
         
         // --- CONSTANTS ---
@@ -890,7 +917,7 @@
             };
 
             return (
-                // MODIFICADO: Eliminamos el fondo azul aquí. Si estamos en preview, usamos bg-white text-black
+                // CAMBIO CLAVE: Si es PREVIEW, usamos bg-white y text-black
                 <div className="bg-white text-black p-6 rounded-lg shadow-2xl dispatch-preview-container">
                     <div className="flex justify-between items-center mb-6 no-print">
                         <h2 className="text-2xl font-bold text-black">Vista Previa de la Planilla</h2>
@@ -1255,7 +1282,6 @@
 
           return (
             // CAMBIO CLAVE: Si es PREVIEW, cambiamos el tema a BLANCO en la pantalla.
-            // Esto engaña al navegador de la tablet para que imprima lo que ve, sin tener que invertir colores.
             <div className={`min-h-screen ${view === 'preview' ? 'bg-white text-black' : 'bg-[#152C47] text-white'}`}>
               <header className="bg-black/20 shadow-lg no-print">
                 <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
