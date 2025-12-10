@@ -11,72 +11,55 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        /* --- ESTILOS DE IMPRESIÓN "NUCLEARES" PARA TABLET --- */
+        /* ESTILOS DE IMPRESIÓN OPTIMIZADOS PARA TABLET */
         @media print {
-            /* 1. Forzar TODO el texto a negro y fondos a blanco */
-            *, *::before, *::after {
-                color: #000000 !important;
+            @page {
+                size: auto;
+                margin: 5mm;
+            }
+
+            /* Forzar reseteo total de colores */
+            body, #root, main, div, span, p, td, th, li, h1, h2, h3 {
                 background-color: transparent !important;
-                box-shadow: none !important;
+                color: #000000 !important;
                 text-shadow: none !important;
+                box-shadow: none !important;
             }
 
-            /* 2. Configurar la página base */
-            html, body {
-                background-color: #ffffff !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100% !important;
-                height: auto !important;
-                overflow: visible !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            /* 3. Ocultar elementos de interfaz (botones, cargas, etc) */
-            .no-print, header, button, input[type="file"], .bg-\[\#2D5E98\] {
+            /* Ocultar interfaz de usuario */
+            .no-print, header, button {
                 display: none !important;
             }
 
-            /* 4. Asegurar que el contenedor principal sea visible */
-            #root, main, .dispatch-preview-container {
-                display: block !important;
-                background-color: white !important;
-                width: 100% !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                position: static !important;
+            /* Ajustes estructurales para evitar hojas en blanco */
+            html, body {
+                width: 100%;
+                height: auto;
+                margin: 0;
+                padding: 0;
+                overflow: visible !important;
             }
 
-            /* 5. Estilos específicos para las tablas y páginas */
-            .dispatch-page {
-                display: block !important;
-                page-break-after: always;
-                page-break-inside: avoid;
-                margin-bottom: 0 !important;
-                width: 100% !important;
-                border: none !important;
-            }
-
-            .dispatch-page:last-child {
-                page-break-after: avoid;
-            }
-
-            /* Importante para Tablet: Asegurar que las tablas ocupen el ancho pero no se desborden */
+            /* Permitir que la tabla se ajuste al ancho del papel (CRÍTICO PARA TABLETS) */
             table {
                 width: 100% !important;
-                table-layout: fixed !important;
-                border-collapse: collapse !important;
-            }
-            
-            td, th {
-                border-color: #000000 !important;
+                min-width: 0 !important; /* Elimina la restricción de 1000px */
+                table-layout: auto !important;
+                font-size: 10px !important; /* Reducir fuente para que quepa */
             }
 
-            /* Re-habilitar imágenes (logos) */
-            img {
-                opacity: 1 !important;
-                visibility: visible !important;
+            .dispatch-page {
+                border: none !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                page-break-after: always;
+                width: 100% !important;
+            }
+
+            /* Asegurar bordes visibles */
+            td, th {
+                border: 1px solid #000 !important;
             }
         }
     </style>
@@ -104,8 +87,8 @@
         
         // --- CONSTANTS ---
         const LOGO_URL = 'https://uemerxsdwrygafqmwvdz.supabase.co/storage/v1/object/sign/imagenes/logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jNzVkZWIxYi00MWYyLTRjN2QtYWQ2Ni0wN2YyNDU1YzNlYTUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbWFnZW5lcy9sb2dvLnBuZyIsImlhdCI6MTc2MTc0NzQ4MiwiZXhwIjoxNzkzMjgzNDgyfQ.ZbKEeYvifiVXIDWlXRek6MZnJY2QS-P3ILYz2MVuCTc';
-        const DELIVERIES_PER_PAGE = 12;
-        const AUDIT_DELIVERIES_PER_PAGE = 12;
+        const DELIVERIES_PER_PAGE = 13;
+        const AUDIT_DELIVERIES_PER_PAGE = 13;
 
 
         // --- ICONS ---
@@ -476,7 +459,8 @@
 
         const DispatchPreviewPage = ({ rows, formData }) => (
             <div className="dispatch-page bg-white p-4 shadow-lg mb-8 text-black">
-                <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
+                {/* NOTA: Eliminamos min-width: 1000px para que quepa en tablet */}
+                <table className="w-full border-collapse border-black text-xs">
                     <tbody>
                         {/* Header Info */}
                         <tr>
@@ -588,7 +572,7 @@
             const numEmptyRows = Math.max(0, AUDIT_DELIVERIES_PER_PAGE - rows.length);
             return (
             <div className="dispatch-page bg-white p-4 shadow-lg mb-8 text-black">
-                <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
+                <table className="w-full border-collapse border-black text-xs">
                     <tbody>
                         {/* Header Info */}
                         <tr>
@@ -753,7 +737,7 @@
 
         const AuditPage2 = () => (
             <div className="dispatch-page bg-white p-4 shadow-lg text-black">
-                <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
+                <table className="w-full border-collapse border-black text-xs">
                     <tbody>
                         {/* Header Info */}
                         <tr>
@@ -906,9 +890,10 @@
             };
 
             return (
-                <div className="bg-[#2D5E98] p-6 rounded-lg shadow-2xl dispatch-preview-container">
+                // MODIFICADO: Eliminamos el fondo azul aquí. Si estamos en preview, usamos bg-white text-black
+                <div className="bg-white text-black p-6 rounded-lg shadow-2xl dispatch-preview-container">
                     <div className="flex justify-between items-center mb-6 no-print">
-                        <h2 className="text-2xl font-bold text-white">Vista Previa de la Planilla</h2>
+                        <h2 className="text-2xl font-bold text-black">Vista Previa de la Planilla</h2>
                         <div className="flex items-center space-x-4">
                              <button onClick={handlePrintAndFinalize} className="px-4 py-2 text-sm font-bold text-[#152C47] bg-[#BACF00] rounded-md hover:bg-[#a7b900] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#152C47] focus:ring-[#BACF00]">
                                 Imprimir
@@ -926,7 +911,7 @@
 
                     {/* --- PAGE 2 (Inspection) --- */}
                     <div className="dispatch-page bg-white p-4 shadow-lg text-black">
-                        <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
+                        <table className="w-full border-collapse border-black text-xs">
                             <tbody>
                                 {/* Header Info */}
                                 <tr>
@@ -1269,10 +1254,12 @@
           }, [selectedDeliveries, formData]);
 
           return (
-            <div className="min-h-screen bg-[#152C47] text-white print:bg-white print:text-black">
+            // CAMBIO CLAVE: Si es PREVIEW, cambiamos el tema a BLANCO en la pantalla.
+            // Esto engaña al navegador de la tablet para que imprima lo que ve, sin tener que invertir colores.
+            <div className={`min-h-screen ${view === 'preview' ? 'bg-white text-black' : 'bg-[#152C47] text-white'}`}>
               <header className="bg-black/20 shadow-lg no-print">
                 <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                  <h1 className="text-2xl font-bold text-white flex items-center">
+                  <h1 className={`text-2xl font-bold flex items-center ${view === 'preview' ? 'text-black' : 'text-white'}`}>
                     <img src={LOGO_URL} alt="Logo de la empresa" className="h-16 w-auto mr-4" />
                     Generador de Planillas de Despacho
                   </h1>
@@ -1333,4 +1320,3 @@
 </body>
 
 </html>
-
