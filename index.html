@@ -4,20 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Generador de Planillas de Despacho</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- XLSX Library for Excel processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- Supabase JS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- React and ReactDOM CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel Standalone for in-browser JSX/TSX transpilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
         /* Custom styles for print layout */
         @media print {
+            /* SOLUCIÓN AL PROBLEMA DE FONDO: Forzar blanco absoluto al imprimir */
+            body, #root, main, .dispatch-preview-container {
+                background-color: white !important;
+                background-image: none !important;
+                color: black !important;
+            }
+
             body {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
@@ -35,6 +37,9 @@
                 page-break-after: always;
                 box-shadow: none !important;
                 border: none !important;
+                /* Asegurar que la página tenga fondo blanco */
+                background-color: white !important; 
+                margin-bottom: 0 !important;
             }
             .dispatch-page:last-child {
                 page-break-after: avoid;
@@ -64,7 +69,7 @@
 }
 </script>
 </head>
-<body class="bg-[#152C47]">
+<body class="bg-[#152C47] print:bg-white">
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
@@ -1241,7 +1246,7 @@
           }, [selectedDeliveries, formData]);
 
           return (
-            <div className="min-h-screen bg-[#152C47] text-white">
+            <div className="min-h-screen bg-[#152C47] text-white print:bg-white print:text-black">
               <header className="bg-black/20 shadow-lg no-print">
                 <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
                   <h1 className="text-2xl font-bold text-white flex items-center">
@@ -1305,4 +1310,3 @@
 </body>
 
 </html>
-
