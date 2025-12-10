@@ -11,49 +11,72 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        /* Custom styles for print layout */
+        /* --- ESTILOS DE IMPRESIÓN "NUCLEARES" PARA TABLET --- */
         @media print {
-            /* SOLUCIÓN AL PROBLEMA DE FONDO: Forzar blanco absoluto al imprimir */
-            body, #root, main, .dispatch-preview-container {
-                background-color: white !important;
-                background-image: none !important;
-                color: black !important;
+            /* 1. Forzar TODO el texto a negro y fondos a blanco */
+            *, *::before, *::after {
+                color: #000000 !important;
+                background-color: transparent !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
             }
 
-            body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .no-print {
-                display: none !important;
-            }
-            main, .dispatch-preview-container {
+            /* 2. Configurar la página base */
+            html, body {
+                background-color: #ffffff !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                box-shadow: none !important;
-                border: none !important;
+                width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
+
+            /* 3. Ocultar elementos de interfaz (botones, cargas, etc) */
+            .no-print, header, button, input[type="file"], .bg-\[\#2D5E98\] {
+                display: none !important;
+            }
+
+            /* 4. Asegurar que el contenedor principal sea visible */
+            #root, main, .dispatch-preview-container {
+                display: block !important;
+                background-color: white !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                position: static !important;
+            }
+
+            /* 5. Estilos específicos para las tablas y páginas */
             .dispatch-page {
+                display: block !important;
                 page-break-after: always;
-                box-shadow: none !important;
-                border: none !important;
-                /* Asegurar que la página tenga fondo blanco */
-                background-color: white !important; 
+                page-break-inside: avoid;
                 margin-bottom: 0 !important;
+                width: 100% !important;
+                border: none !important;
             }
+
             .dispatch-page:last-child {
                 page-break-after: avoid;
             }
-            .print-new-page {
-                page-break-before: always;
-            }
-            .dispatch-table-container {
-                width: 100%;
-                overflow: visible;
-            }
+
+            /* Importante para Tablet: Asegurar que las tablas ocupen el ancho pero no se desborden */
             table {
                 width: 100% !important;
-                min-width: 0 !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+            }
+            
+            td, th {
+                border-color: #000000 !important;
+            }
+
+            /* Re-habilitar imágenes (logos) */
+            img {
+                opacity: 1 !important;
+                visibility: visible !important;
             }
         }
     </style>
@@ -69,7 +92,7 @@
 }
 </script>
 </head>
-<body class="bg-[#152C47] print:bg-white">
+<body class="bg-[#152C47]">
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
