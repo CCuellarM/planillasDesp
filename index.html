@@ -4,90 +4,66 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Generador de Planillas de Despacho</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- XLSX Library for Excel processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Supabase JS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- React and ReactDOM CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel Standalone for in-browser JSX/TSX transpilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        /* ESTILOS DE IMPRESIÓN OPTIMIZADOS PARA TABLET - Nivel de Agresividad Extrema */
+        /* Custom styles for print layout */
         @media print {
-            /* 1. Resetear el control de color de la impresora */
-            html, body {
-                -webkit-print-color-adjust: exact !important; /* CRÍTICO para Chrome/Android */
-                print-color-adjust: exact !important; /* Estándar */
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
-
-            @page {
-                size: auto;
-                margin: 5mm;
-            }
-
-            /* 2. Forzar reseteo TOTAL de colores y fondos en CADA elemento */
-            *, *::before, *::after, 
-            body, #root, main, div, span, p, td, th, li, h1, h2, h3 {
-                background: #ffffff !important; /* Fondo blanco */
-                background-color: #ffffff !important; /* Fondo blanco */
-                color: #000000 !important; /* Letra negra */
-                border-color: #000000 !important; /* Bordes negros */
-                text-shadow: none !important;
-                box-shadow: none !important;
-                opacity: 1 !important;
-                visibility: visible !important;
-            }
-            
-            /* 3. Re-Aplicar bordes necesarios */
-            table, td, th {
-                border-color: #000000 !important;
-                border-collapse: collapse !important;
-            }
-
-
-            /* 4. Ocultar interfaz de usuario */
-            .no-print, header, button {
+            .no-print {
                 display: none !important;
-                visibility: hidden !important;
-                height: 0 !important;
-                overflow: hidden !important;
             }
-
-            /* 5. Ajustes estructurales para evitar hojas en blanco */
-            html, body {
-                width: 100%;
-                height: auto;
-                margin: 0;
-                padding: 0;
-                overflow: visible !important;
-            }
-
-            /* 6. Permitir que la tabla se ajuste al ancho del papel (CRÍTICO PARA TABLETS) */
-            table {
-                width: 100% !important;
-                min-width: 0 !important; 
-                table-layout: auto !important;
-                font-size: 10px !important; 
-            }
-
-            .dispatch-page {
-                border: none !important;
-                box-shadow: none !important;
+            main, .dispatch-preview-container {
                 margin: 0 !important;
                 padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+            .dispatch-page {
                 page-break-after: always;
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                padding: 6mm !important;
+            }
+            .dispatch-page:last-child {
+                page-break-after: avoid;
+            }
+            .print-new-page {
+                page-break-before: always;
+            }
+            .dispatch-table-container {
+                width: 100%;
+                overflow: visible;
+            }
+            table {
                 width: 100% !important;
+                min-width: 0 !important;
             }
-
-            /* Asegurar bordes visibles */
-            td, th {
-                border: 1px solid #000 !important;
-            }
-            
-            /* Asegurar que las imágenes (como el logo) se muestren */
-            img {
-                filter: none !important;
-                display: block !important;
-            }
+        }
+        /* Make each dispatch page fill A4 height so filler row works */
+        .dispatch-page {
+            display: flex;
+            flex-direction: column;
+        }
+        .dispatch-page table {
+            flex: 1;
+            height: 100%;
+        }
+        .dispatch-page table tbody {
+            height: 100%;
         }
     </style>
 <script type="importmap">
@@ -484,10 +460,13 @@
           );
         };
 
-        const DispatchPreviewPage = ({ rows, formData }) => (
-            <div className="dispatch-page bg-white p-4 shadow-lg mb-8 text-black">
-                {/* NOTA: Eliminamos min-width: 1000px para que quepa en tablet */}
-                <table className="w-full border-collapse border-black text-xs">
+        const DispatchPreviewPage = ({ rows, formData }) => {
+            // Calculate how many empty rows to add to visually fill the page.
+            // We use a flex last-row approach: one filler row that expands.
+            const hasData = rows.length > 0;
+            return (
+            <div className="dispatch-page bg-white p-4 shadow-lg mb-8 text-black" style={{width:'210mm', minHeight:'297mm', boxSizing:'border-box'}}>
+                <table className="w-full border-collapse border-black text-xs" style={{width:'100%', tableLayout:'fixed'}}>
                     <tbody>
                         {/* Header Info */}
                         <tr>
@@ -543,63 +522,68 @@
                             <td colSpan="13" className="p-2 border border-black">ENTREGA DE REPUESTOS</td>
                         </tr>
                         <tr className="bg-gray-100 font-bold text-center">
-                            <td className="p-1 border border-black align-middle" style={{width: '8%'}}>Centro Destino</td>
-                            <td className="p-1 border border-black align-middle" colSpan="2" style={{width: '15%'}}>Nombre Destinatario</td>
-                            <td className="p-1 border border-black align-middle" colSpan="2" style={{width: '15%'}}>N° Entrega<br/>Traslado</td>
-                            <td className="p-1 border border-black align-middle" style={{width: '7%'}}>N°<br/>Piezas</td>
-                            <td className="p-1 border border-black align-middle" style={{width: '7%'}}>N° Precinto</td>
-                            <td className="p-1 border border-black align-middle" style={{width: '7%'}}>Canastilla<br/>N°</td>
-                            <td className="p-1 border border-black align-middle" colSpan="3" style={{width: '25%'}}>Observaciones (vidrios, piezas sueltas, puertas, costados, bumpers)</td>
+                            <td className="p-1 border border-black align-middle" style={{width: '7%'}}>Centro Destino</td>
+                            <td className="p-1 border border-black align-middle" colSpan="2" style={{width: '13%'}}>Nombre Destinatario</td>
+                            <td className="p-1 border border-black align-middle" colSpan="2" style={{width: '13%'}}>N° Entrega<br/>Traslado</td>
+                            <td className="p-1 border border-black align-middle" style={{width: '6%'}}>N°<br/>Piezas</td>
+                            <td className="p-1 border border-black align-middle" style={{width: '6%'}}>N° Precinto</td>
+                            <td className="p-1 border border-black align-middle" style={{width: '6%'}}>Canastilla<br/>N°</td>
+                            <td className="p-1 border border-black align-middle" colSpan="2" style={{width: '20%'}}>Observaciones (vidrios, piezas sueltas, puertas, costados, bumpers)</td>
+                            <td className="p-1 border border-black align-middle" style={{width: '13%'}}>Dest. Entrega<br/>Física</td>
                             <td className="p-1 border border-black align-middle" colSpan="2" style={{width: '16%'}}>Recibido</td>
                         </tr>
 
                         {/* Delivery Data Rows */}
-                        {rows.map(row => (
-                            <tr key={row.customerCode} style={row.selectedDeliveries.length < 8 ? { height: '96px' } : {}}>
+                        {rows.map(row => {
+                            const count = row.selectedDeliveries.length;
+                            const fontSize = count <= 4 ? '11px' : count <= 8 ? '9px' : count <= 12 ? '7.5px' : '6px';
+                            const minH = row.estimatedHeight ? `${row.estimatedHeight}px` : '56px';
+                            return (
+                            <tr key={row.customerCode} style={{ height: minH }}>
                                 <td className="p-1 border border-black text-center align-top">{row.customerCode}</td>
                                 <td className="p-1 border border-black text-center align-top" colSpan="2">{row.customerName}</td>
-                                <td className="p-1 border border-black text-center align-top whitespace-pre-wrap font-mono" colSpan="2" style={{ fontSize: '11px' }}>
-                                    {Array.from({ length: Math.ceil(row.selectedDeliveries.length / 2) })
+                                <td className="p-1 border border-black text-center align-top whitespace-pre-wrap font-mono" colSpan="2" style={{ fontSize }}>
+                                    {Array.from({ length: Math.ceil(count / 2) })
                                         .map((_, index) => {
                                             const i = index * 2;
                                             const first = row.selectedDeliveries[i];
                                             const second = row.selectedDeliveries[i + 1];
-                                            if (second) {
-                                                return `${first} - ${second}`;
-                                            }
-                                            return first;
+                                            return second ? `${first} - ${second}` : first;
                                         })
                                         .join('\n')}
                                 </td>
                                 <td className="p-1 border border-black"></td>
                                 <td className="p-1 border border-black"></td>
                                 <td className="p-1 border border-black"></td>
-                                <td className="p-1 border border-black" colSpan="3"></td>
+                                <td className="p-1 border border-black" colSpan="2"></td>
+                                <td className="p-1 border border-black"></td>
                                 <td className="p-1 border border-black" colSpan="2"></td>
                             </tr>
-                        ))}
-                        {Array.from({ length: Math.max(0, DELIVERIES_PER_PAGE - rows.length) }).map((_, i) => (
-                            <tr key={`empty-${i}`} style={{height: '93px'}}>
-                                <td className="p-1 border border-black"></td>
-                                <td className="p-1 border border-black" colSpan="2"></td>
-                                <td className="p-1 border border-black" colSpan="2"></td>
-                                <td className="p-1 border border-black"></td>
-                                <td className="p-1 border border-black"></td>
-                                <td className="p-1 border border-black"></td>
-                                <td className="p-1 border border-black" colSpan="3"></td>
-                                <td className="p-1 border border-black" colSpan="2"></td>
-                            </tr>
-                        ))}
+                            );
+                        })}
+
+                        {/* Filler row — expands to consume remaining page space */}
+                        <tr style={{ height: '100%' }}>
+                            <td className="border-l border-b border-r border-black"></td>
+                            <td className="border-b border-r border-black" colSpan="2"></td>
+                            <td className="border-b border-r border-black" colSpan="2"></td>
+                            <td className="border-b border-r border-black"></td>
+                            <td className="border-b border-r border-black"></td>
+                            <td className="border-b border-r border-black"></td>
+                            <td className="border-b border-r border-black" colSpan="2"></td>
+                            <td className="border-b border-r border-black"></td>
+                            <td className="border-b border-r border-black" colSpan="2"></td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
-        );
+            );};
         
         const AuditPage1 = ({ rows }) => {
             const numEmptyRows = Math.max(0, AUDIT_DELIVERIES_PER_PAGE - rows.length);
             return (
             <div className="dispatch-page bg-white p-4 shadow-lg mb-8 text-black">
-                <table className="w-full border-collapse border-black text-xs">
+                <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
                     <tbody>
                         {/* Header Info */}
                         <tr>
@@ -764,7 +748,7 @@
 
         const AuditPage2 = () => (
             <div className="dispatch-page bg-white p-4 shadow-lg text-black">
-                <table className="w-full border-collapse border-black text-xs">
+                <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
                     <tbody>
                         {/* Header Info */}
                         <tr>
@@ -889,12 +873,32 @@
             }, [customers, selectedDeliveries]);
 
             const pages = React.useMemo(() => {
-                const numPages = Math.ceil(deliveryRows.length / DELIVERIES_PER_PAGE);
-                return Array.from({ length: numPages }, (_, i) => {
-                    const start = i * DELIVERIES_PER_PAGE;
-                    const end = start + DELIVERIES_PER_PAGE;
-                    return deliveryRows.slice(start, end);
-                });
+                // A4 usable height for data rows after header overhead (~160px fixed rows)
+                const PAGE_AVAILABLE_PX = 820;
+
+                // Estimate rendered height of a data row based on number of deliveries.
+                // Deliveries render in pairs per line. Min height 56px, each line ~17px.
+                const rowHeight = (deliveryCount) => {
+                    const lines = Math.max(1, Math.ceil(deliveryCount / 2));
+                    return Math.max(56, lines * 17 + 24);
+                };
+
+                const result = [];
+                let currentPage = [];
+                let currentHeight = 0;
+
+                for (const row of deliveryRows) {
+                    const h = rowHeight(row.selectedDeliveries.length);
+                    if (currentHeight + h > PAGE_AVAILABLE_PX && currentPage.length > 0) {
+                        result.push(currentPage);
+                        currentPage = [];
+                        currentHeight = 0;
+                    }
+                    currentPage.push({ ...row, estimatedHeight: h });
+                    currentHeight += h;
+                }
+                if (currentPage.length > 0) result.push(currentPage);
+                return result;
             }, [deliveryRows]);
 
             const auditPages = React.useMemo(() => {
@@ -917,10 +921,9 @@
             };
 
             return (
-                // CAMBIO CLAVE: Si es PREVIEW, usamos bg-white y text-black
-                <div className="bg-white text-black p-6 rounded-lg shadow-2xl dispatch-preview-container">
+                <div className="bg-[#2D5E98] p-6 rounded-lg shadow-2xl dispatch-preview-container">
                     <div className="flex justify-between items-center mb-6 no-print">
-                        <h2 className="text-2xl font-bold text-black">Vista Previa de la Planilla</h2>
+                        <h2 className="text-2xl font-bold text-white">Vista Previa de la Planilla</h2>
                         <div className="flex items-center space-x-4">
                              <button onClick={handlePrintAndFinalize} className="px-4 py-2 text-sm font-bold text-[#152C47] bg-[#BACF00] rounded-md hover:bg-[#a7b900] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#152C47] focus:ring-[#BACF00]">
                                 Imprimir
@@ -938,7 +941,7 @@
 
                     {/* --- PAGE 2 (Inspection) --- */}
                     <div className="dispatch-page bg-white p-4 shadow-lg text-black">
-                        <table className="w-full border-collapse border-black text-xs">
+                        <table className="w-full border-collapse border-black text-xs" style={{minWidth: '1000px'}}>
                             <tbody>
                                 {/* Header Info */}
                                 <tr>
@@ -994,7 +997,7 @@
                                     <td className="p-1 border border-black" colSpan="3">Nombre quien recibe</td>
                                     <td className="p-1 border border-black" colSpan="3">Firma de recibido</td>
                                 </tr>
-                                {Array.from({ length: 2 }).map((_, i) => (
+                                {Array.from({ length: 9 }).map((_, i) => (
                                     <tr key={`cargo-${i}`} style={{height: '24px'}}>
                                         <td className="p-1 border border-black" colSpan="2"></td>
                                         <td className="p-1 border border-black"></td>
@@ -1281,11 +1284,10 @@
           }, [selectedDeliveries, formData]);
 
           return (
-            // CAMBIO CLAVE: Si es PREVIEW, cambiamos el tema a BLANCO en la pantalla.
-            <div className={`min-h-screen ${view === 'preview' ? 'bg-white text-black' : 'bg-[#152C47] text-white'}`}>
+            <div className="min-h-screen bg-[#152C47] text-white">
               <header className="bg-black/20 shadow-lg no-print">
                 <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                  <h1 className={`text-2xl font-bold flex items-center ${view === 'preview' ? 'text-black' : 'text-white'}`}>
+                  <h1 className="text-2xl font-bold text-white flex items-center">
                     <img src={LOGO_URL} alt="Logo de la empresa" className="h-16 w-auto mr-4" />
                     Generador de Planillas de Despacho
                   </h1>
@@ -1346,4 +1348,3 @@
 </body>
 
 </html>
-
