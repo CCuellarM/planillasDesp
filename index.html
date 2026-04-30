@@ -100,8 +100,8 @@
     // Vehicle/driver block uses a nested table inside a colSpan="11" cell so
     // its column widths are fully independent from the 11-col delivery table.
     //
-    // IDENTIFICACIÓN fix: CONDUCTOR label+value take cols 5-9 (5 cols, 42%),
-    // leaving cols 10-12 for IDENTIFICACIÓN label+value (3 cols = 27%).
+    // DOCUMENTO fix: CONDUCTOR label+value take cols 5-9 (5 cols, 42%),
+    // leaving cols 10-12 for DOCUMENTO label+value (3 cols = 27%).
     // This gives the cedula field enough room without overflow.
     const PageHeader = ({ formData }) => (
         <>
@@ -144,7 +144,7 @@
                     {/* Vehicle / driver block
                         12 cols: 6%+5%+7%+8% | 9%+8% | 6%+9% | 6%+9% | 9%+18% = 100%
                         RUTA row: CONDUCTOR takes col5+6 (label, 17%) + col7+8+9 (value, 24%)
-                                  IDENTIFICACIÓN takes col10 (label, 6%) + col11+12 (value, 27%) */}
+                                  DOCUMENTO takes col10 (label, 6%) + col11+12 (value, 27%) */}
                     <table style={{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' }}>
                         <colgroup>
                             <col style={{width:'6%'}}  />
@@ -183,8 +183,8 @@
                                 {/* CONDUCTOR: label 2 cols, value 3 cols */}
                                 <td className="border border-black" colSpan="2" style={hS}>NOMBRE DEL<br/>CONDUCTOR</td>
                                 <td className="border border-black text-center" colSpan="3" style={{...vS, whiteSpace:'normal'}}>{formData.conductor?.nombres || ''}</td>
-                                {/* IDENTIFICACIÓN: label 1 col, value 2 cols (19%) — wider than before */}
-                                <td className="border border-black" style={hS}>IDENTIFICACIÓN</td>
+                                {/* DOCUMENTO: label 1 col, value 2 cols (19%) — wider than before */}
+                                <td className="border border-black" style={hS}>DOCUMENTO</td>
                                 <td className="border border-black text-center" colSpan="2" style={{...vS, whiteSpace:'normal', fontSize:'9px'}}>{formData.conductor?.cedula || ''}</td>
                             </tr>
                         </tbody>
@@ -338,7 +338,7 @@
                         <td className="p-1 border-l border-r border-black font-bold text-center" colSpan="6">QUIEN ENTREGA:</td>
                         <td className="p-1 border-r border-black font-bold text-center" colSpan="7">QUIEN RECIBE:</td>
                     </tr>
-                    {[['Nombre','Nombre'],['Cargo','Identificación'],['Firma','Firma']].map(([l, r], i) => (
+                    {[['Nombre','Nombre'],['Cargo','Documento'],['Firma','Firma']].map(([l, r], i) => (
                         <tr key={l} style={{height:'28px'}}>
                             <td className={`p-1 border-l border-black font-bold ${i===2?'border-b':''}`}>{l}</td>
                             <td className={`p-1 border-r border-black ${i===2?'border-b':''}`} colSpan="5"></td>
@@ -579,7 +579,7 @@
                         <td className="p-1 border-l border-r border-black font-bold text-center" colSpan="4">QUIEN ENTREGA:</td>
                         <td className="p-1 border-r border-black font-bold text-center" colSpan="5">QUIEN RECIBE:</td>
                     </tr>
-                    {[['Nombre','Nombre'],['Cargo','Identificación'],['Firma','Firma']].map(([l, r], i) => (
+                    {[['Nombre','Nombre'],['Cargo','Documento'],['Firma','Firma']].map(([l, r], i) => (
                         <tr key={l} style={{height:'26px'}}>
                             <td className={`p-1 border-l border-black font-bold ${i===2?'border-b':''}`}>{l}</td>
                             <td className={`p-1 border-r border-black ${i===2?'border-b':''}`} colSpan="3"></td>
