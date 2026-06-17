@@ -671,7 +671,7 @@
                 </Sel>
                 <Sel label="Ruta" value={formData.ruta}
                     onChange={e => setFormData(p => ({ ...p, ruta: e.target.value }))}>
-                    {['Centro','Sur','Norte','Chía'].map(r => <option key={r} value={r}>{r}</option>)}
+                    {['Centro','Sur','Norte'].map(r => <option key={r} value={r}>{r}</option>)}
                 </Sel>
             </div>
         </div>
